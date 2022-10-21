@@ -1,0 +1,15 @@
+Flask
+Flask-SQLAlchemy
+SQLAlchemy-serializer
+flask-restx
+werkzeug==2.1.2 
+pandas
+
+
+black
+pdoc3
+pylint
+
+# export FLASK_APP=app.py 
+# export FLASK_ENV=development
+# flask run --reload
