@@ -39,12 +39,47 @@ def map_objects(dct: dict = None):
         _type_: object type and title
     """    
     genres = [Genre(name=it) for it in str(dct["genres"]).split(",")]
-    type = Type(name=str(dct["titletype"]), description=str(dct["titletype"]))
     title = Title(**dct)
-    title.type = type    
     [title.lst_genres.append(gen) for gen in genres]
     
-    return type,title
+    if "titletype" in dct:
+        type = Type(name=str(dct["titletype"]), description=str(dct["titletype"]))
+        title.type = type 
+        return type,title
+    else:
+        return [title]
+
+def process_frame(df):
+    type_and_titles = list(map(map_objects, df.to_dict(orient="records")))
+    save_objects(type_and_titles)
+    return len(df)
+
+def import_dataframe_by_chunk():
+    import multiprocessing as mp
+    
+    LARGE_FILE = "static//files//title.basics.tsv.gz"
+    df = pd.read_csv(LARGE_FILE, compression="gzip", sep="	", header=0)
+    column_headers = list(map(map_headers, df.columns.values.tolist()))
+    print(column_headers)
+    df.columns = column_headers
+
+    CHUNKSIZE = 1000 # processing 100,000 rows at a time
+    reader = pd.read_table(LARGE_FILE, chunksize=CHUNKSIZE)
+    pool = mp.Pool(4) # use 4 processes
+
+    funclist = []
+    for df in reader:
+            # process each data frame
+            df.columns = column_headers
+            f = pool.apply_async(process_frame,[df])
+            funclist.append(f)
+            
+    result = 0
+    for f in funclist:
+            result += f.get(timeout=10) # timeout in 10 seconds
+
+    print (f"There are {result} rows of data")
+    return f"There are {result} rows of data"
 
 
 def save_objects(lst_obj):
@@ -68,14 +103,12 @@ class movies(Resource):
         return jsonify([tt.to_dict() for tt in Title.query.all()])
 
     def post(self):
-        file = "static//files//title.basics.tsv.gz"
-        df = pd.read_csv(file, compression="gzip", sep="	", header=0)
-        column_headers = list(map(map_headers, df.columns.values.tolist()))
-        print(column_headers)
-        df.columns = column_headers
+        result = import_dataframe_by_chunk()
+        return { result: result},201
         # df2 = df.head().to_dict(orient="records")
-        type_and_titles = list(map(map_objects, df.to_dict(orient="records")))
-        save_objects(type_and_titles)
+
+        # type_and_titles = list(map(map_objects, df.to_dict(orient="records")))
+        # save_objects(type_and_titles)
 
 # @app.route("/")
 # def main():
